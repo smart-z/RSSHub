@@ -135,6 +135,7 @@ export type RoutePath =
   | `/agora0/pen0`
   | `/agri/:category{.+}?`
   | `/ahjzu/news`
+  | `/ai-bot/daily-ai-news`
   | `/aiaa/journal/:journalID`
   | `/aibase/daily`
   | `/aibase/discover/:id?`
@@ -306,6 +307,12 @@ export type RoutePath =
   | `/bilibili/mall/new/:category?`
   | `/bilibili/manga/followings/:uid/:limits?`
   | `/bilibili/manga/update/:comicid`
+  | `/bilibili/message/at/:uid`
+  | `/bilibili/message/like/:uid`
+  | `/bilibili/message/reply/:uid`
+  | `/bilibili/message/sessions/:uid`
+  | `/bilibili/message/system/:uid`
+  | `/bilibili/message/unread/:uid`
   | `/bilibili/partion/:tid/:embed?`
   | `/bilibili/partion/ranking/:tid/:days?/:embed?`
   | `/bilibili/platform/:area?/:p_type?/:uid?`
@@ -748,6 +755,7 @@ export type RoutePath =
   | `/dianping/user/:id`
   | `/diariofruticola/filtro/:filter{.+}`
   | `/diershoubing/news`
+  | `/digg/community/:community`
   | `/digitalcameraworld/news`
   | `/digitalpolicyalert/activity-tracker/:filters?`
   | `/dingshao/share/:shortId`
@@ -1475,7 +1483,6 @@ export type RoutePath =
   | `/infoq/presentations/:conference?`
   | `/infoq/recommend`
   | `/infoq/topic/:id`
-  | `/informedainews/zh-Hans/docs/:type`
   | `/informs/:category?`
   | `/infzm/:id`
   | `/infzm/hot`
@@ -1662,6 +1669,7 @@ export type RoutePath =
   | `/kyodonews/:language?/:keyword?`
   | `/laimanhua/:id`
   | `/lala/`
+  | `/lancedb/blog/:category?`
   | `/landiannews/`
   | `/landiannews/category/:slug`
   | `/landiannews/tag/:slug`
@@ -2011,6 +2019,8 @@ export type RoutePath =
   | `/now/news/:category?/:id?`
   | `/nowcoder/discuss/:type/:order`
   | `/nowcoder/experience/:tagId`
+  | `/nowcoder/hots/:type?`
+  | `/nowcoder/interview/:jobId`
   | `/nowcoder/jobcenter/:recruitType?/:city?/:type?/:order?/:latest?`
   | `/nowcoder/recommend`
   | `/nowcoder/schedule/:propertyId?/:typeId?`
