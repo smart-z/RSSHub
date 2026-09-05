@@ -1,4 +1,5 @@
-import zlib from 'node:zlib';
+import { promisify } from 'node:util';
+import { gunzip as gunzipCallback } from 'node:zlib';
 
 import { load } from 'cheerio';
 import markdownit from 'markdown-it';
@@ -7,6 +8,8 @@ import type { Route } from '@/types';
 import cache from '@/utils/cache';
 import ofetch from '@/utils/ofetch';
 import { parseDate } from '@/utils/parse-date';
+
+const gunzip = promisify(gunzipCallback);
 
 const md = markdownit({
     breaks: true,
@@ -30,7 +33,7 @@ export const route: Route = {
 
 async function handler() {
     const baseUrl = 'https://www.typeless.com';
-    const platforms = ['macos', 'windows', 'ios'];
+    const platforms = ['macos', 'windows', 'ios', 'android'];
 
     const decompressedData = await Promise.all(
         platforms.map(async (platform) => {
@@ -42,16 +45,16 @@ async function handler() {
             const nextData = JSON.parse($('#__NEXT_DATA__').text());
             const pageProps = nextData.props.pageProps;
 
-            return cache.tryGet(`typeless:changelog:${platform}:${pageProps.updatedAt}`, () => {
+            return cache.tryGet<{ appPlatform: string; decompressedData: any[] }>(`typeless:changelog:${platform}:${pageProps.updatedAt}`, async () => {
                 const compressedData = pageProps.compressedData;
 
                 const decodedString = Buffer.from(compressedData, 'base64');
-                const decompressed = zlib.gunzipSync(decodedString).toString('utf-8');
-                const changelogData = JSON.parse(decompressed);
+                const decompressed = await gunzip(decodedString);
+                const changelogData = JSON.parse(decompressed.toString('utf-8'));
 
                 return {
-                    appPlatform: pageProps.appPlatform,
-                    decompressedData: changelogData[pageProps.staticKey] || changelogData.en,
+                    appPlatform: pageProps.platform,
+                    decompressedData: Object.values<any>(changelogData),
                 };
             });
         })
