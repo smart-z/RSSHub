@@ -3,29 +3,29 @@ import type { Context } from 'hono';
 
 import type { Data, DataItem, Route } from '@/types';
 import { ViewType } from '@/types';
+import cache from '@/utils/cache';
 import logger from '@/utils/logger';
 import { parseDate } from '@/utils/parse-date';
-import { getPuppeteerPage } from '@/utils/puppeteer';
+import { getPlaywrightPage } from '@/utils/playwright';
 
 export const handler = async (ctx: Context): Promise<Data> => {
-    const limit = Number.parseInt(ctx.req.query('limit') ?? '20', 10);
+    const limit = Number(ctx.req.query('limit') ?? '20');
 
     const baseUrl = 'https://www.perplexity.ai';
     const targetUrl = `${baseUrl}/changelog`;
 
     logger.http(`Fetching Perplexity changelog from ${targetUrl}`);
 
-    const { page, destory } = await getPuppeteerPage(targetUrl, {
+    const { page, destroy, context } = await getPlaywrightPage(targetUrl, {
         onBeforeLoad: async (page) => {
-            await page.setRequestInterception(true);
-            page.on('request', (request) => {
-                request.resourceType() === 'document' ? request.continue() : request.abort();
+            await page.route('**/*', (route) => {
+                const request = route.request();
+                request.resourceType() === 'document' ? route.continue() : route.abort();
             });
         },
     });
-    const html = await page.evaluate(() => document.documentElement.innerHTML);
-    await destory();
 
+    const html = await page.evaluate(() => document.documentElement.getHTML());
     const $ = load(html);
     const language = $('html').attr('lang') ?? 'en';
 
@@ -33,7 +33,7 @@ export const handler = async (ctx: Context): Promise<Data> => {
 
     const items = $('a[href^="./changelog/"]')
         .toArray()
-        .map((elem) => {
+        .map((elem): DataItem | null => {
             const $link = $(elem);
             const href = $link.attr('href');
 
@@ -47,12 +47,9 @@ export const handler = async (ctx: Context): Promise<Data> => {
                 return null;
             }
 
-            const $title = $link.find('[data-framer-name="Title"] p').first();
-            const title = $title.text().trim();
-
-            if (!title) {
-                return null;
-            }
+            const $title = $link.find('[data-framer-name="Title"]').first();
+            // Fallback: extract title from URL slug
+            const title = $title.text().trim() || href.replace('./changelog/', '').replaceAll('-', ' ');
 
             const $category = $link.find('[data-framer-name="Category"] p').first();
             const dateText = $category.text().trim();
@@ -90,15 +87,57 @@ export const handler = async (ctx: Context): Promise<Data> => {
                 pubDate,
                 guid: `perplexity-changelog-${fullLink}`,
                 id: `perplexity-changelog-${fullLink}`,
-            } as DataItem;
+            };
         })
         .filter((item): item is DataItem => item !== null);
+
+    // Fetch full content for each item using the same browser session
+    const resultItems = await Promise.all(
+        items.slice(0, limit).map(async (item) => {
+            if (!item.link) {
+                return item;
+            }
+            return await cache.tryGet(item.link, async () => {
+                logger.http(`Fetching full content for ${item.link!}`);
+
+                // Create a new page in the same browser session
+                const contentPage = await context.newPage();
+
+                // Set request interception for this page
+                await contentPage.route('**/*', (route) => {
+                    const request = route.request();
+                    request.resourceType() === 'document' ? route.continue() : route.abort();
+                });
+
+                // Navigate to the item link
+                await contentPage.goto(item.link!, { waitUntil: 'domcontentloaded' });
+
+                const contentHtml = await contentPage.evaluate(() => document.documentElement.getHTML());
+                await contentPage.close();
+
+                const $content = load(contentHtml);
+
+                // Find the main article content - RichTextContainer with substantial text
+                // Look for elements with framer-text class containing actual content
+                const contentContainer = $content('div#main > div > div > div[data-framer-component-type="RichTextContainer"]').first();
+                const fullContent = contentContainer.html()?.trim() || '';
+
+                return {
+                    ...item,
+                    description: fullContent || item.description,
+                };
+            });
+        })
+    );
+
+    // Close the browser session after all requests are done
+    await destroy();
 
     return {
         title: $('title').text() || 'Perplexity Changelog',
         description: $('meta[name="description"], meta[property="og:description"]').first().attr('content') || 'Latest updates and changes from Perplexity',
         link: targetUrl,
-        item: items.slice(0, limit),
+        item: resultItems,
         allowEmpty: true,
         image: $('meta[property="og:image"]').attr('content'),
         language: language as 'en',
