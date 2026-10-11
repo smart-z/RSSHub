@@ -1,6 +1,6 @@
 import { load } from 'cheerio';
 
-import { InvalidParameterError } from '@/errors/types/invalid-parameter';
+import InvalidParameterError from '@/errors/types/invalid-parameter';
 import type { Route } from '@/types';
 import ofetch from '@/utils/ofetch';
 import { parseDate } from '@/utils/parse-date';
@@ -70,10 +70,10 @@ async function handler(ctx) {
                 pubDate: parseDate(
                     details
                         .find('time')
-                        .attr('datetime')
-                        ?.replace(/on\s\w+?day\s/, '')
-                        ?.replace('@', '')
-                        ?.replace(/(\d{2}:\d{2})(\w{2})$/, '$1 $2')
+                        .attr('datetime')!
+                        .replace(/on\s\w+?day\s/, '')
+                        .replace('@', '')
+                        .replace(/(\d{2}:\d{2})(\w{2})$/, '$1 $2')
                 ),
             };
         });
